@@ -90,8 +90,12 @@ const loginUser = asyncHandler(async (req, res) => {
 // @access  Public
 const logoutUser = asyncHandler(async (req, res) => {
   // Clear the cookie by setting it to empty string and setting expiry to past date
+  // Must match the same sameSite/secure settings used when setting the cookie
+  const isProduction = process.env.NODE_ENV === "production";
   res.cookie("token", "", {
     httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "strict",
     expires: new Date(0),
   });
 

@@ -20,9 +20,23 @@ const app = express();
 
 // 4. Configure Middlewares
 // CORS (Cross-Origin Resource Sharing): Allow requests from our React frontend
+// We whitelist both localhost (dev) and the deployed frontend URL (prod)
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  process.env.FRONTEND_URL,        // Render frontend URL set in env vars
+].filter(Boolean);                  // Remove undefined if FRONTEND_URL is not set
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: function (origin, callback) {
+      // Allow requests with no origin (Postman, mobile apps, curl)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS blocked: ${origin} is not allowed`));
+    },
     credentials: true, // Allow sending HTTP-only cookies back and forth
   })
 );
