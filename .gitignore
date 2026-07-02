@@ -1,0 +1,15 @@
+# Node.js dependencies
+node_modules/
+
+# Environment variables — NEVER commit this!
+.env
+
+# Upload temp folder
+uploads/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
