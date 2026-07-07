@@ -169,6 +169,86 @@ const deleteUser = asyncHandler(async (req, res) => {
   sendResponse(res, 200, 'User deleted successfully');
 });
 
+// @desc    Register or Login user via Google Auth (Firebase ID token verification)
+// @route   POST /api/auth/google
+// @access  Public
+const googleLogin = asyncHandler(async (req, res) => {
+  const { idToken } = req.body;
+
+  if (!idToken) {
+    res.status(400);
+    throw new Error("Firebase ID Token is required");
+  }
+
+  // Use the modern firebase-admin v12+ modular API
+  const { getAuth } = require("../config/firebaseAdmin");
+
+  let decodedToken;
+  try {
+    decodedToken = await getAuth().verifyIdToken(idToken);
+  } catch (error) {
+    res.status(401);
+    throw new Error(`Firebase token verification failed: ${error.message}`);
+  }
+
+  const { email, name, picture, uid } = decodedToken;
+
+  if (!email) {
+    res.status(400);
+    throw new Error("Email address not provided by Google account");
+  }
+
+  // Find user by email
+  let user = await User.findOne({ email });
+
+  if (!user) {
+    // Automatically create a new user in MongoDB
+    user = await User.create({
+      name: name || email.split("@")[0],
+      email: email,
+      authProvider: "google",
+      firebaseUid: uid,
+      avatar: {
+        url: picture || "",
+        public_id: "",
+      },
+    });
+  } else {
+    // If user exists, sync firebaseUid and avatar if it was not stored previously
+    let modified = false;
+    if (!user.firebaseUid) {
+      user.firebaseUid = uid;
+      modified = true;
+    }
+    if (!user.authProvider || user.authProvider === "local") {
+      user.authProvider = "google";
+      modified = true;
+    }
+    if (picture && (!user.avatar || !user.avatar.url)) {
+      user.avatar = {
+        url: picture,
+        public_id: "",
+      };
+      modified = true;
+    }
+    if (modified) {
+      await user.save();
+    }
+  }
+
+  // Generate JWT token & set it inside the HTTP-only cookie
+  const token = generateToken(res, user._id);
+
+  sendResponse(res, 200, "Logged in via Google successfully", {
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    avatar: user.avatar,
+    token,
+  });
+});
+
 module.exports = {
   registerUser,
   loginUser,
@@ -177,4 +257,5 @@ module.exports = {
   getAllUsers,
   updateUserRole,
   deleteUser,
+  googleLogin,
 };

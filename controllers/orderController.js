@@ -5,7 +5,9 @@ const asyncHandler = require("express-async-handler");
 const Order = require("../models/Order");
 const Cart = require("../models/Cart");
 const Product = require("../models/Product");
+const User = require("../models/User");
 const sendResponse = require("../utils/apiResponse");
+const { sendOrderStatusEmail } = require("../services/emailService");
 
 // @desc    Place a new order
 // @route   POST /api/orders
@@ -166,6 +168,29 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   }
 
   const updatedOrder = await order.save();
+
+  // ── Send Email Notification (non-blocking) ──────────────────────────────────
+  // Fires AFTER the order is saved. Email failure MUST NOT rollback order update.
+  (async () => {
+    try {
+      // Fetch the customer's email and name
+      const customer = await User.findById(updatedOrder.user).select("name email");
+      if (customer && customer.email) {
+        await sendOrderStatusEmail(
+          updatedOrder,
+          customer.email,
+          customer.name || "Valued Customer",
+          orderStatus
+        );
+      } else {
+        console.warn(`⚠️  Email skipped: Customer not found for order ${updatedOrder._id}`);
+      }
+    } catch (emailErr) {
+      // Email errors are logged but never re-thrown
+      console.error(`❌ Background email error for order ${updatedOrder._id}:`, emailErr.message);
+    }
+  })();
+
   sendResponse(res, 200, `Order status updated to ${orderStatus}`, updatedOrder);
 });
 

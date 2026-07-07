@@ -30,7 +30,9 @@ const userSchema = new mongoose.Schema(
 
     password: {
       type: String,
-      required: [true, "Password is required"],
+      required: function() {
+        return !this.authProvider || this.authProvider === "local";
+      },
       minlength: [6, "Password must be at least 6 characters"],
       select: false, // IMPORTANT: password is NEVER returned in queries by default
                      // You must explicitly do User.findOne().select('+password')
@@ -45,6 +47,17 @@ const userSchema = new mongoose.Schema(
     avatar: {
       public_id: { type: String, default: "" },   // Cloudinary public ID (for deletion)
       url: { type: String, default: "" },          // Cloudinary image URL
+    },
+
+    authProvider: {
+      type: String,
+      enum: ["local", "google"],
+      default: "local",
+    },
+
+    firebaseUid: {
+      type: String,
+      default: "",
     },
 
     // For password reset functionality (optional but good to have)
@@ -66,18 +79,15 @@ const userSchema = new mongoose.Schema(
 userSchema.pre("save", async function () {
   // "this" refers to the current user document being saved
 
-  // If password was NOT modified, skip hashing (e.g., when updating email)
-  if (!this.isModified("password")) {
+  // If password was NOT modified or is not set, skip hashing
+  if (!this.isModified("password") || !this.password) {
     return;
   }
 
   // bcrypt.genSalt(10) generates a "salt" (random string added to password)
-  // The number 10 is the "cost factor" — higher = more secure but slower
-  // 10 is the industry standard balance between security and speed
   const salt = await bcrypt.genSalt(10);
 
   // Hash the password using the salt
-  // bcrypt.hash("myPassword123", salt) → "$2a$10$..."
   this.password = await bcrypt.hash(this.password, salt);
 });
 

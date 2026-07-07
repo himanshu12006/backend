@@ -9,6 +9,7 @@ const {
   getAllUsers,
   updateUserRole,
   deleteUser,
+  googleLogin,
 } = require("../controllers/authController");
 const { protect, isAdmin } = require("../middleware/authMiddleware");
 
@@ -16,6 +17,7 @@ const { protect, isAdmin } = require("../middleware/authMiddleware");
 router.post("/register", registerUser);
 router.post("/login", loginUser);
 router.post("/logout", logoutUser);
+router.post("/google", googleLogin);
 
 // User protected routes
 router.get("/profile", protect, getUserProfile);

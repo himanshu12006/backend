@@ -15,6 +15,9 @@ dotenv.config();
 // 2. Connect to MongoDB
 connectDB();
 
+// 2b. Initialize Firebase Admin SDK (eager load so credentials are validated on startup)
+require("./config/firebaseAdmin");
+
 // 3. Initialize Express App
 const app = express();
 
