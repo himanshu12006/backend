@@ -13,31 +13,48 @@ const sendResponse = require("../utils/apiResponse");
 const registerUser = asyncHandler(async (req, res) => {
   const { name, email, password } = req.body;
 
-  // 1. Basic validation
+  // 1. Basic presence check
   if (!name || !email || !password) {
     res.status(400);
     throw new Error("Please enter all fields (name, email, password)");
   }
 
-  // 2. Check if user already exists in the database
-  const userExists = await User.findOne({ email });
+  // 2. Email format validation — trim and normalize to lowercase first
+  const trimmedEmail = email.trim().toLowerCase();
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  if (!emailRegex.test(trimmedEmail)) {
+    res.status(400);
+    throw new Error("Please enter a valid email address.");
+  }
+
+  // 3. Password strength validation
+  const passRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+  if (!passRegex.test(password)) {
+    res.status(400);
+    throw new Error(
+      "Password must contain at least 8 characters, including an uppercase letter, lowercase letter, and number."
+    );
+  }
+
+  // 4. Check if user already exists in the database
+  const userExists = await User.findOne({ email: trimmedEmail });
   if (userExists) {
     res.status(400);
     throw new Error("A user with this email already exists");
   }
 
-  // 3. Create user (password is automatically hashed by User model pre-save hook)
+  // 5. Create user (password is automatically hashed by User model pre-save hook)
   const user = await User.create({
     name,
-    email,
+    email: trimmedEmail,
     password,
   });
 
   if (user) {
-    // 4. Generate JWT token & set it inside the HTTP-only cookie
+    // 6. Generate JWT token & set it inside the HTTP-only cookie
     const token = generateToken(res, user._id);
 
-    // 5. Send success response back (excluding the password)
+    // 7. Send success response back (excluding the password)
     sendResponse(res, 201, "User registered successfully", {
       _id: user._id,
       name: user.name,
@@ -50,6 +67,7 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new Error("Invalid user data");
   }
 });
+
 
 // @desc    Authenticate user & get token (Login)
 // @route   POST /api/auth/login

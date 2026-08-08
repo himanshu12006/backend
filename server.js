@@ -67,6 +67,7 @@ app.use("/api/products", require("./routes/productRoutes"));
 app.use("/api/cart", require("./routes/cartRoutes"));
 app.use("/api/orders", require("./routes/orderRoutes"));
 app.use("/api/payment", require("./routes/paymentRoutes"));
+app.use("/api/notifications", require("./routes/notificationRoutes"));
 
 // 7. Global Error Handlers (MUST be mounted at the end after all routes)
 // Route not found handler (falls through if request matches no route above)

@@ -26,7 +26,17 @@ const orderItemSchema = new mongoose.Schema({
 
 const shippingAddressSchema = new mongoose.Schema({
   fullName: { type: String, required: true },
-  phone: { type: String, required: true },
+  phone: {
+    type: String,
+    required: true,
+    validate: {
+      validator: function (v) {
+        return /^[6789]\d{9}$/.test(v);
+      },
+      message: (props) =>
+        `${props.value} is not a valid 10-digit Indian mobile number. Must start with 6, 7, 8, or 9.`,
+    },
+  },
   address: { type: String, required: true },
   city: { type: String, required: true },
   state: { type: String, required: true },

@@ -23,8 +23,8 @@ const userSchema = new mongoose.Schema(
       lowercase: true,                          // always store as lowercase
       trim: true,
       match: [
-        /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
-        "Please enter a valid email",
+        /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+        "Please enter a valid email address",
       ],
     },
 
@@ -33,7 +33,7 @@ const userSchema = new mongoose.Schema(
       required: function() {
         return !this.authProvider || this.authProvider === "local";
       },
-      minlength: [6, "Password must be at least 6 characters"],
+      minlength: [8, "Password must be at least 8 characters"],
       select: false, // IMPORTANT: password is NEVER returned in queries by default
                      // You must explicitly do User.findOne().select('+password')
     },

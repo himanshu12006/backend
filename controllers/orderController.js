@@ -8,6 +8,7 @@ const Product = require("../models/Product");
 const User = require("../models/User");
 const sendResponse = require("../utils/apiResponse");
 const { sendOrderStatusEmail } = require("../services/emailService");
+const { createNotification } = require("./notificationController");
 
 // @desc    Place a new order
 // @route   POST /api/orders
@@ -19,6 +20,15 @@ const placeOrder = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error("Please fill in complete shipping address (fullName, phone, address, city, state, pincode)");
   }
+
+  // Validate phone number — must be exactly 10 digits, starting with 6/7/8/9 (Indian mobile)
+  const phoneVal = shippingAddress.phone ? shippingAddress.phone.trim().replace(/\s+/g, "") : "";
+  const phoneRegex = /^[6789]\d{9}$/;
+  if (!phoneRegex.test(phoneVal)) {
+    res.status(400);
+    throw new Error("Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.");
+  }
+  shippingAddress.phone = phoneVal; // Store cleaned value
 
   // 1. Fetch user's cart
   const cart = await Cart.findOne({ user: req.user._id }).populate("items.product");
@@ -98,6 +108,15 @@ const placeOrder = asyncHandler(async (req, res) => {
   cart.items = [];
   await cart.save();
 
+  // 7. Emit admin notification (non-blocking — never blocks order placement)
+  createNotification({
+    type: "new_order",
+    title: "🛒 New Order Placed",
+    message: `${shippingAddress.fullName} placed a new order for ₹${totalPrice.toLocaleString("en-IN")} (${orderItems.length} item${orderItems.length !== 1 ? "s" : ""}) via ${normalizedPaymentMethod}.`,
+    refId: order._id.toString(),
+    refLabel: `#${order._id.toString().slice(-8).toUpperCase()}`,
+  });
+
   sendResponse(res, 201, "Order placed successfully", order);
 });
 
@@ -165,6 +184,14 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
         await product.save();
       }
     }
+    // Emit cancelled order notification (non-blocking)
+    createNotification({
+      type: "cancelled_order",
+      title: "❌ Order Cancelled",
+      message: `Order ${"#" + order._id.toString().slice(-8).toUpperCase()} has been cancelled by admin.`,
+      refId: order._id.toString(),
+      refLabel: `#${order._id.toString().slice(-8).toUpperCase()}`,
+    });
   }
 
   const updatedOrder = await order.save();

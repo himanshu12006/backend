@@ -8,6 +8,7 @@ const Order = require("../models/Order");
 const Cart = require("../models/Cart");
 const Product = require("../models/Product");
 const sendResponse = require("../utils/apiResponse");
+const { createNotification } = require("./notificationController");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // @desc    Create a Razorpay order (Step 1 of payment flow)
@@ -79,7 +80,7 @@ const verifyPaymentAndPlaceOrder = asyncHandler(async (req, res) => {
     throw new Error("Payment verification failed. Invalid signature.");
   }
 
-  // ── Step 2: Validate shipping address ─────────────────────────────────────
+  // ── Step 2: Validate shipping address ────────────────────────────────────────────
   if (
     !shippingAddress ||
     !shippingAddress.fullName ||
@@ -91,6 +92,15 @@ const verifyPaymentAndPlaceOrder = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error("Complete shipping address is required");
   }
+
+  // ── Step 2b: Validate phone number ────────────────────────────────────────
+  const phoneVal = shippingAddress.phone ? shippingAddress.phone.trim().replace(/\s+/g, "") : "";
+  const phoneRegex = /^[6789]\d{9}$/;
+  if (!phoneRegex.test(phoneVal)) {
+    res.status(400);
+    throw new Error("Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.");
+  }
+  shippingAddress.phone = phoneVal; // Store cleaned value
 
   // ── Step 3: Fetch user's cart ─────────────────────────────────────────────
   const cart = await Cart.findOne({ user: req.user._id }).populate("items.product");
@@ -155,15 +165,36 @@ const verifyPaymentAndPlaceOrder = asyncHandler(async (req, res) => {
     paidAt: Date.now(),
   });
 
-  // ── Step 7: Reduce stock ──────────────────────────────────────────────────
+  // ── Step 7: Reduce stock ────────────────────────────────────────────────────
+  const LOW_STOCK_THRESHOLD = 5;
   for (const item of productsToUpdate) {
     item.productObj.stock -= item.quantity;
     await item.productObj.save();
+
+    // Emit low-stock notification if stock drops to threshold or below (non-blocking)
+    if (item.productObj.stock <= LOW_STOCK_THRESHOLD) {
+      createNotification({
+        type: "low_stock",
+        title: "⚠️ Low Stock Alert",
+        message: `"${item.productObj.name}" has only ${item.productObj.stock} unit${item.productObj.stock !== 1 ? "s" : ""} remaining in stock.`,
+        refId: item.productObj._id.toString(),
+        refLabel: item.productObj.name,
+      });
+    }
   }
 
   // ── Step 8: Clear cart ────────────────────────────────────────────────────
   cart.items = [];
   await cart.save();
+
+  // ── Step 9: Emit admin notification (non-blocking) ──────────────────────────────
+  createNotification({
+    type: "new_order",
+    title: "🛒 New Order (Razorpay)",
+    message: `${shippingAddress.fullName} completed a Razorpay payment of ₹${totalPrice.toLocaleString("en-IN")} — Order ${"#" + order._id.toString().slice(-8).toUpperCase()} confirmed.`,
+    refId: order._id.toString(),
+    refLabel: `#${order._id.toString().slice(-8).toUpperCase()}`,
+  });
 
   sendResponse(res, 201, "Payment verified and order placed successfully", order);
 });
