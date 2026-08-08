@@ -437,18 +437,43 @@ const sendOrderStatusEmail = async (order, customerEmail, customerName, status) 
   const htmlContent = generateEmailHTML(order, customerName, status);
   const fromAddress = process.env.EMAIL_FROM || "OM CLOTH HOUSE <onboarding@resend.dev>";
 
+  // try {
+  //   const response = await resend.emails.send({
+  //     from:    fromAddress,
+  //     to:      [customerEmail],
+  //     subject: subject,
+  //     html:    htmlContent,
+  //   });
+
+  //   console.log(`✅ Email sent [${status}] → ${customerEmail} | ID: ${response?.data?.id || "N/A"}`);
+  // } catch (err) {
+  //   // CRITICAL: Never throw here — email failures must never crash the API
+  //   console.error(`❌ Email send failed for order ${order._id}: ${err.message}`);
+  // }
   try {
     const response = await resend.emails.send({
-      from:    fromAddress,
-      to:      [customerEmail],
-      subject: subject,
-      html:    htmlContent,
+        from: fromAddress,
+        to: [customerEmail],
+        subject: subject,
+        html: htmlContent,
     });
 
-    console.log(`✅ Email sent [${status}] → ${customerEmail} | ID: ${response?.data?.id || "N/A"}`);
+    console.log("🔍 COMPLETE RESEND RESPONSE:", response);
+
+    if (response?.error) {
+        console.error("❌ RESEND ERROR:", response.error);
+        return;
+    }
+
+    console.log(
+        `✅ Email accepted by Resend [${status}] → ${customerEmail} | ID: ${response?.data?.id || "N/A"}`
+    );
+
   } catch (err) {
-    // CRITICAL: Never throw here — email failures must never crash the API
-    console.error(`❌ Email send failed for order ${order._id}: ${err.message}`);
+      console.error(
+          `❌ Email send failed for order ${order._id}:`,
+          err
+      );
   }
 };
 
