@@ -11,12 +11,23 @@
 
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
+
+// Use an ABSOLUTE path so the uploads folder is always found
+// regardless of which directory Node.js is started from.
+const UPLOADS_DIR = path.join(__dirname, "../uploads");
+
+// Auto-create the uploads folder if it doesn't exist
+// (prevents ENOENT errors after a fresh clone or system wipe)
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
 
 // diskStorage = saves files to disk (our uploads/ folder)
 const storage = multer.diskStorage({
   // destination: where to save the file temporarily
   destination: function (req, file, cb) {
-    cb(null, "uploads/"); // cb(error, folder path)
+    cb(null, UPLOADS_DIR); // absolute path — always works
   },
 
   // filename: what to name the saved file
@@ -24,7 +35,7 @@ const storage = multer.diskStorage({
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(null, file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname));
-    // Example: image-1699123456789-123456789.jpg
+    // Example: images-1699123456789-123456789.jpg
   },
 });
 
